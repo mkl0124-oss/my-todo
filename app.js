@@ -1,4 +1,5 @@
 /* ✨ 오늘의 할 일 — 이미경님 전용 보드
+   board-version: 20261119160027
    데이터: data-enc.js 의 암호문(window.MY_TODO_ENC)을 비밀번호로 풀어서 씁니다.
    평문 할 일 내용은 저장소에 올리지 않습니다. */
 (function () {
@@ -23,14 +24,16 @@
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
-  function seoulToday() {
+  function seoulIsoOf(d) {
     var f = new Intl.DateTimeFormat('en-US', {
       timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
     });
     var p = {};
-    f.formatToParts(new Date()).forEach(function (x) { p[x.type] = x.value; });
+    f.formatToParts(d).forEach(function (x) { p[x.type] = x.value; });
     return p.year + '-' + p.month + '-' + p.day;
   }
+
+  function seoulToday() { return seoulIsoOf(new Date()); }
 
   function parseISO(s) {
     var a = String(s).split('-');
@@ -174,6 +177,21 @@
     try { localStorage.removeItem(KEY_STORE); } catch (e) {}
   }
 
+  /* 저장된 날짜값을 YYYY-MM-DD 로 다듬습니다. (예전 형식·날짜시간 문자열 대비) */
+  function normDue(v) {
+    var s = String(v || '').trim();
+    if (!s) return '';
+    var m = s.match(/^(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
+    if (m) {
+      var iso = m[1] + '-' + pad(+m[2]) + '-' + pad(+m[3]);
+      return isNaN(parseISO(iso).getTime()) ? '' : iso;
+    }
+    var d = new Date(s);
+    return isNaN(d.getTime()) ? '' : seoulIsoOf(d);
+  }
+
+  function newId() { return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
   /* ---------- 저장소 ---------- */
 
   function loadDone() {
@@ -199,7 +217,22 @@
     try {
       var raw = localStorage.getItem(EXTRA_KEY);
       var arr = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(arr)) EXTRAS = arr.filter(function (x) { return x && x.text; });
+      if (!Array.isArray(arr)) return;
+      EXTRAS = arr.filter(function (x) { return x && x.text; }).map(function (x) {
+        /* 마감일이 비어 있는 예전 항목은 '오늘'로 밀지 않고, 추가한 날을 마감일로 되살립니다. */
+        var created = '';
+        if (x.created) {
+          var c = new Date(x.created);
+          if (!isNaN(c.getTime())) created = seoulIsoOf(c);
+        }
+        return {
+          id: x.id || newId(),
+          text: String(x.text),
+          category: x.category || MINE_CAT,
+          dueDate: normDue(x.dueDate) || normDue(x.due) || created || seoulToday(),
+          created: x.created || ''
+        };
+      });
     } catch (e) { EXTRAS = []; }
   }
 
@@ -597,13 +630,25 @@
       var dueDate = seoulToday();
       if (due) {
         if (due.value === 'tomorrow') dueDate = shiftISO(seoulToday(), 1);
-        else if (due.value === 'pick') dueDate = (date && date.value) || seoulToday();
+        else if (due.value === 'pick') {
+          /* 날짜를 고르지 않았으면 오늘로 넣지 말고 날짜 칸을 열어 줍니다. */
+          if (!(date && date.value)) {
+            if (date) {
+              date.hidden = false;
+              date.min = seoulToday();
+              if (!date.value) date.value = shiftISO(seoulToday(), 2);
+              try { date.focus(); } catch (e2) {}
+            }
+            return;
+          }
+          dueDate = normDue(date.value) || seoulToday();
+        }
       }
 
       EXTRAS.push({
-        id: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        id: newId(),
         text: value,
-        category: ((cat && cat.value) || '').trim() || '내가 추가',
+        category: ((cat && cat.value) || '').trim() || MINE_CAT,
         dueDate: dueDate,
         created: new Date().toISOString()
       });
