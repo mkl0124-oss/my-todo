@@ -1,5 +1,5 @@
 /* ✨ 오늘의 할 일 — 이미경님 전용 보드
-   board-version: 20261119162210
+   board-version: 20261119172020
    데이터: data-enc.js 의 암호문(window.MY_TODO_ENC)을 비밀번호로 풀어서 씁니다.
    평문 할 일 내용은 저장소에 올리지 않습니다. */
 (function () {
