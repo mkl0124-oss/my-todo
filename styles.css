@@ -193,8 +193,8 @@ body.locked .app { display: none; }
   box-shadow: var(--shadow);
   padding: 10px 10px 10px 14px;
 }
-.add-top { margin-bottom: 18px; }
-.add-bottom { margin-top: 18px; box-shadow: none; background: #fbfaf7; }
+/* 추가 폼은 보드 아래 하나뿐입니다. */
+.add-bottom { margin-top: 18px; }
 
 .add-line { display: flex; align-items: center; gap: 8px; }
 .add-input {

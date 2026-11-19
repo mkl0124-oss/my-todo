@@ -1,5 +1,5 @@
 /* ✨ 오늘의 할 일 — 이미경님 전용 보드
-   board-version: 20261119160027
+   board-version: 20261119161211
    데이터: data-enc.js 의 암호문(window.MY_TODO_ENC)을 비밀번호로 풀어서 씁니다.
    평문 할 일 내용은 저장소에 올리지 않습니다. */
 (function () {
@@ -823,7 +823,6 @@
 
     bindDone();
     bindLock();
-    bindAddForm({ form: 'addTop', text: 'addTopText', cat: 'addTopCat', due: 'addTopDue', date: 'addTopDate' });
     bindAddForm({ form: 'addBottom', text: 'addBottomText', cat: 'addBottomCat', due: 'addBottomDue', date: 'addBottomDate' });
 
     document.addEventListener('visibilitychange', function () {

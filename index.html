@@ -8,9 +8,9 @@
 <meta name="apple-mobile-web-app-title" content="오늘의 할 일">
 <meta name="description" content="오늘의 할 일">
 <meta name="robots" content="noindex, nofollow">
-<meta name="board-version" content="20261119160027">
+<meta name="board-version" content="20261119161211">
 <title>오늘의 할 일</title>
-<link rel="stylesheet" href="styles.css?v=20261119160027">
+<link rel="stylesheet" href="styles.css?v=20261119161211">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>✨</text></svg>">
 </head>
 <body class="locked">
@@ -52,25 +52,6 @@
 
   <main class="wrap">
 
-    <form class="add-form add-top" id="addTop" autocomplete="off">
-      <div class="add-line">
-        <input type="text" class="add-input" id="addTopText" maxlength="80"
-               placeholder="+ 할 일 추가" aria-label="할 일 추가">
-        <button type="submit" class="add-btn">추가</button>
-      </div>
-      <div class="add-meta">
-        <input type="text" class="add-cat" id="addTopCat" maxlength="20" list="catList"
-               placeholder="카테고리" aria-label="카테고리">
-        <select class="add-due" id="addTopDue" aria-label="마감일">
-          <option value="today">오늘</option>
-          <option value="tomorrow">내일</option>
-          <option value="pick">날짜</option>
-        </select>
-        <input type="date" class="add-date" id="addTopDate" aria-label="날짜 선택" hidden>
-      </div>
-      <datalist id="catList"></datalist>
-    </form>
-
     <div id="board" class="board"></div>
 
     <p class="empty" id="empty" hidden>다 비웠어요 🌿<span>오늘은 여기까지!</span></p>
@@ -91,6 +72,7 @@
         </select>
         <input type="date" class="add-date" id="addBottomDate" aria-label="날짜 선택" hidden>
       </div>
+      <datalist id="catList"></datalist>
     </form>
 
     <section class="done-box">
@@ -110,8 +92,8 @@
   <footer class="foot">체크하면 스르륵 사라져요 · 남은 일은 자동으로 기기에 저장돼요</footer>
 </div>
 
-<script src="data-enc.js?v=20261119160027"></script>
-<script src="app.js?v=20261119160027"></script>
+<script src="data-enc.js?v=20261119161211"></script>
+<script src="app.js?v=20261119161211"></script>
 <script>
 /* 판올림 감지: index.html 이 캐시에 남아 있어도 새 배포를 알아채고 스스로 새 주소로 다시 엽니다. */
 (function () {
