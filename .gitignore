@@ -1,0 +1,15 @@
+# 저장소에는 암호문(data.enc.json, data-enc.js)만 올립니다.
+
+# 평문 데이터 (로컬 원본)
+data.json
+
+# 비밀번호·salt (로컬 전용)
+.board-pass
+.board-salt
+
+# Python
+__pycache__/
+*.pyc
+
+# 암호문 지문 (로컬 전용)
+.board-enc-meta

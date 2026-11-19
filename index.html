@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f4ef">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="오늘의 할 일">
+<meta name="description" content="오늘의 할 일">
+<meta name="robots" content="noindex, nofollow">
+<title>오늘의 할 일</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>✨</text></svg>">
+</head>
+<body class="locked">
+
+<!-- 잠금 화면 -->
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-icon" aria-hidden="true">🔒</div>
+    <h1 class="lock-title">오늘의 할 일</h1>
+    <p class="lock-sub">비밀번호를 입력하면 열려요</p>
+
+    <form class="lock-form" id="lockForm" autocomplete="off" novalidate>
+      <input class="lock-input" id="lockInput" type="password" inputmode="numeric"
+             pattern="[0-9]*" maxlength="12" autocomplete="off" autocorrect="off"
+             autocapitalize="off" spellcheck="false" placeholder="비밀번호" aria-label="비밀번호">
+      <label class="lock-remember">
+        <input type="checkbox" id="rememberDevice" checked>
+        <span>이 기기에서 잠금 해제 유지</span>
+      </label>
+      <button type="submit" class="lock-btn" id="lockSubmit">열기</button>
+    </form>
+
+    <p class="lock-error" id="lockError" role="alert" aria-live="polite"></p>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+
+  <header class="hero">
+    <div class="hero-top">
+      <h1 class="title">✨ 오늘의 할 일</h1>
+      <button type="button" class="lock-now" id="lockNow" aria-label="잠금">🔒</button>
+    </div>
+    <div class="hero-row">
+      <p class="today" id="todayLabel">오늘</p>
+      <span class="pill" id="remainCount">0</span>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <form class="add-form add-top" id="addTop" autocomplete="off">
+      <div class="add-line">
+        <input type="text" class="add-input" id="addTopText" maxlength="80"
+               placeholder="+ 할 일 추가" aria-label="할 일 추가">
+        <button type="submit" class="add-btn">추가</button>
+      </div>
+      <div class="add-meta">
+        <input type="text" class="add-cat" id="addTopCat" maxlength="20" list="catList"
+               placeholder="카테고리" aria-label="카테고리">
+        <select class="add-due" id="addTopDue" aria-label="마감일">
+          <option value="today">오늘</option>
+          <option value="tomorrow">내일</option>
+          <option value="pick">날짜</option>
+        </select>
+        <input type="date" class="add-date" id="addTopDate" aria-label="날짜 선택" hidden>
+      </div>
+      <datalist id="catList"></datalist>
+    </form>
+
+    <div id="board" class="board"></div>
+
+    <p class="empty" id="empty" hidden>다 비웠어요 🌿<span>오늘은 여기까지!</span></p>
+
+    <form class="add-form add-bottom" id="addBottom" autocomplete="off">
+      <div class="add-line">
+        <input type="text" class="add-input" id="addBottomText" maxlength="80"
+               placeholder="+ 할 일 추가" aria-label="할 일 추가">
+        <button type="submit" class="add-btn">추가</button>
+      </div>
+      <div class="add-meta">
+        <input type="text" class="add-cat" id="addBottomCat" maxlength="20" list="catList"
+               placeholder="카테고리" aria-label="카테고리">
+        <select class="add-due" id="addBottomDue" aria-label="마감일">
+          <option value="today">오늘</option>
+          <option value="tomorrow">내일</option>
+          <option value="pick">날짜</option>
+        </select>
+        <input type="date" class="add-date" id="addBottomDate" aria-label="날짜 선택" hidden>
+      </div>
+    </form>
+
+    <section class="done-box">
+      <button type="button" class="done-toggle" id="doneToggle" aria-expanded="false" aria-controls="doneBody">
+        <span>완료함 <b id="doneCount">0</b></span>
+        <span class="chev" aria-hidden="true">▾</span>
+      </button>
+      <div class="done-body" id="doneBody" hidden>
+        <ul class="done-list" id="doneList"></ul>
+        <p class="done-empty" id="doneEmpty">아직 비운 일이 없어요</p>
+        <button type="button" class="ghost" id="clearDone">완료함 비우기</button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">체크하면 스르륵 사라져요 · 남은 일은 자동으로 기기에 저장돼요</footer>
+</div>
+
+<script src="data-enc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
