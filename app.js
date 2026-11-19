@@ -1,6 +1,6 @@
 /* ✨ 오늘의 할 일 — 이미경님 전용 보드
-   board-version: 20261119172020
-   데이터: data-enc.js 의 암호문(window.MY_TODO_ENC)을 비밀번호로 풀어서 씁니다.
+   board-version: 20261119173016
+   데이터: 열 때마다 data.enc.json 을 직접 받아(data-enc.js 는 예비용) 비밀번호로 풀어서 씁니다.
    평문 할 일 내용은 저장소에 올리지 않습니다. */
 (function () {
   'use strict';
@@ -10,13 +10,18 @@
   var KEY_STORE = 'mytodo.key.v1';      /* 이 기기 잠금 해제 키 */
   var DAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
   var MINE_CAT = '내가 추가';           /* 카테고리를 비우고 추가한 항목의 묶음 이름 */
+  var DATA_REFRESH_MS = 5 * 60 * 1000;  /* 화면을 띄워 둔 동안 최신 데이터를 다시 확인하는 간격 */
 
-  var ENC = null;      /* window.MY_TODO_ENC */
+  var ENC = null;      /* window.MY_TODO_ENC 또는 방금 받은 data.enc.json */
   var DATA = null;     /* 복호화된 보드 데이터 */
   var DONE = {};       /* 완료 상태 */
   var EXTRAS = [];     /* 로컬 추가 항목 */
   var TODAY = '';
   var dayTimer = null;
+  var MY_VER = '';     /* index.html 이 기억하는 코드 버전 */
+  var refreshing = false;
+  var refreshInFlight = null;
+  var refreshNoteTimer = null;
 
   var el = {};
 
@@ -177,6 +182,33 @@
     try { localStorage.removeItem(KEY_STORE); } catch (e) {}
   }
 
+  /* ---------- 최신 암호문 직접 받기 (정적 data-enc.js 는 실패할 때 쓰는 예비) ---------- */
+
+  function validEnc(e) {
+    return !!(e && e.salt && e.iv && e.ciphertext);
+  }
+
+  function encSig(e) {
+    return e ? String(e.salt || '') + '|' + String(e.iv || '') + '|' + String(e.ciphertext || '') : '';
+  }
+
+  /* 캐시를 건너뛰고 서버의 최신 암호문을 받아 옵니다. 실패하면 null. */
+  function fetchEnc() {
+    if (!window.fetch) return Promise.resolve(null);
+    return fetch('./data.enc.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { return validEnc(j) ? j : null; })
+      .catch(function () { return null; });
+  }
+
+  function fetchLatestVersion() {
+    if (!window.fetch) return Promise.resolve('');
+    return fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { return (j && j.version) || ''; })
+      .catch(function () { return ''; });
+  }
+
   /* 저장된 날짜값을 YYYY-MM-DD 로 다듬습니다. (예전 형식·날짜시간 문자열 대비) */
   function normDue(v) {
     var s = String(v || '').trim();
@@ -238,6 +270,101 @@
 
   function saveExtras() {
     try { localStorage.setItem(EXTRA_KEY, JSON.stringify(EXTRAS)); } catch (e) {}
+  }
+
+  /* ---------- 새 데이터 받아서 다시 그리기 ---------- */
+
+  /* 화면만 다시 그립니다. (스크롤 위치·잠금 상태는 그대로) */
+  function applyData(data) {
+    DATA = data;
+    TODAY = seoulToday();
+    fillCatList(collect());
+    render();
+  }
+
+  /* 최신 암호문을 받아 내용이 바뀌었을 때만 다시 그립니다.
+     결과: 'updated' | 'same' | 'fail' | 'locked' */
+  function refreshData() {
+    if (!AES_KEY || !DATA) return Promise.resolve('locked');
+    if (refreshInFlight) return refreshInFlight;   /* 여러 번 불려도 요청은 한 번만 */
+
+    var prev = ENC;
+    refreshInFlight = fetchEnc().then(function (enc) {
+      if (!enc) { ENC = prev; return 'fail'; }
+      if (encSig(enc) === encSig(prev)) { ENC = prev; return 'same'; }
+      ENC = enc;
+      return decryptWith(AES_KEY).then(function (data) {
+        applyData(data);
+        return 'updated';
+      }).catch(function () {
+        ENC = prev;
+        return 'fail';
+      });
+    }).catch(function () {
+      ENC = prev;
+      return 'fail';
+    }).then(function (res) {
+      refreshInFlight = null;
+      return res;
+    });
+    return refreshInFlight;
+  }
+
+  function setRefreshState(state, note) {
+    var btn = el.refresh;
+    if (btn) {
+      btn.classList.toggle('is-busy', state === 'busy');
+      btn.classList.toggle('is-done', state === 'done');
+      btn.classList.toggle('is-fail', state === 'fail');
+      btn.setAttribute('aria-label', state === 'busy' ? '새로고침 중' : '새로고침');
+    }
+    if (refreshNoteTimer) { clearTimeout(refreshNoteTimer); refreshNoteTimer = null; }
+    if (el.refreshNote) {
+      el.refreshNote.textContent = note || '';
+      el.refreshNote.classList.toggle('show', !!note);
+    }
+    if (note) {
+      refreshNoteTimer = setTimeout(function () {
+        refreshNoteTimer = null;
+        if (el.refreshNote) {
+          el.refreshNote.textContent = '';
+          el.refreshNote.classList.remove('show');
+        }
+        if (btn) btn.classList.remove('is-done', 'is-fail');
+      }, 2000);
+    }
+  }
+
+  /* 코드가 바뀌었으면 캐시를 건너뛸 주소로 한 번 다시 열립니다. */
+  function goToVersion(v) {
+    var u;
+    try { u = new URL(location.href); } catch (e) { return false; }
+    if (u.searchParams.get('v') === v) return false;
+    u.searchParams.set('v', v);
+    location.replace(u.toString());
+    return true;
+  }
+
+  /* 헤더의 새로고침 버튼: 코드 판올림 → 다시 열기, 데이터만 바뀜 → 바로 다시 받기 */
+  function refreshNow() {
+    if (refreshing) return;
+    refreshing = true;
+    setRefreshState('busy');
+
+    fetchLatestVersion().then(function (v) {
+      if (v && MY_VER && v !== MY_VER && goToVersion(v)) return null;
+      return refreshData();
+    }).then(function (res) {
+      refreshing = false;
+      if (res === null) return;   /* 새 주소로 이동 중 */
+      if (res === 'updated') setRefreshState('done', '업데이트뎠어요');
+      else if (res === 'same') setRefreshState('done', '최신 상태예요');
+      else if (res === 'locked') setRefreshState('fail', '잠금을 먼저 풀어 주세요');
+      else setRefreshState('fail', '연결을 확인해 주세요');
+    }).catch(function () {
+      refreshing = false;
+      setRefreshState('fail', '연결을 확인해 주세요');
+    });
   }
 
   /* ---------- 보드 데이터 합치기 ---------- */
@@ -820,29 +947,55 @@
     el.empty = $('empty');
     el.todayLabel = $('todayLabel');
     el.remainCount = $('remainCount');
+    el.refresh = $('refreshNow');
+    el.refreshNote = $('refreshNote');
+
+    var verMeta = document.querySelector('meta[name="board-version"]');
+    MY_VER = verMeta ? (verMeta.getAttribute('content') || '') : '';
 
     bindDone();
     bindLock();
     bindAddForm({ form: 'addBottom', text: 'addBottomText', cat: 'addBottomCat', due: 'addBottomDue', date: 'addBottomDate' });
 
-    document.addEventListener('visibilitychange', function () {
-      if (!document.hidden && DATA && seoulToday() !== TODAY) render();
-    });
+    if (el.refresh) el.refresh.addEventListener('click', refreshNow);
 
-    ENC = (window.MY_TODO_ENC && window.MY_TODO_ENC.ciphertext) ? window.MY_TODO_ENC : null;
-    if (!ENC) { showLock('보드 데이터를 찾지 못했어요. 잠시 뒤 다시 열어 주세요.'); return; }
+    /* 앱으로 돌아왔을 때: 날짜가 바뀌었으면 다시 그리고, 데이터도 최신으로 맞춥니다. */
+    function wake() {
+      if (!DATA) return;
+      if (seoulToday() !== TODAY) render();
+      refreshData();
+    }
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) wake();
+    });
+    window.addEventListener('pageshow', function () { wake(); });
+    window.addEventListener('focus', function () { wake(); });
+
+    /* 화면을 띄워 둔 동안에도 가끔 새 데이터를 확인합니다. (숨겨져 있을 땐 쉼) */
+    setInterval(function () {
+      if (!document.hidden && DATA) refreshData();
+    }, DATA_REFRESH_MS);
+
     if (!cryptoReady()) {
       showLock('이 환경에서는 잠금을 열 수 없어요. 인터넷 주소로 열어 주세요.', true);
       return;
     }
 
+    var fallback = validEnc(window.MY_TODO_ENC) ? window.MY_TODO_ENC : null;
     var stored = loadStoredKey();
-    if (!stored) { showLock(''); return; }
 
-    crypto.subtle.importKey('raw', stored, { name: 'AES-GCM' }, true, ['decrypt'])
-      .then(function (key) { return decryptWith(key).then(function (data) { return { key: key, data: data }; }); })
-      .then(function (res) { AES_KEY = res.key; showBoard(res.data); })
-      .catch(function () { forgetKey(); showLock(''); });
+    /* 열 때마다 서버의 최신 암호문을 먼저 받아 옵니다. (오프라인·실패 시 정적 data-enc.js) */
+    fetchEnc().then(function (fresh) {
+      ENC = fresh || fallback;
+      if (!ENC) { showLock('보드 데이터를 찾지 못했어요. 잠시 뒤 다시 열어 주세요.'); return; }
+      if (!stored) { showLock(''); return; }
+
+      return crypto.subtle.importKey('raw', stored, { name: 'AES-GCM' }, true, ['decrypt'])
+        .then(function (key) { return decryptWith(key).then(function (data) { return { key: key, data: data }; }); })
+        .then(function (res) { AES_KEY = res.key; showBoard(res.data); })
+        .catch(function () { forgetKey(); showLock(''); });
+    });
   }
 
   if (document.readyState === 'loading') {

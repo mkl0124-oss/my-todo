@@ -154,6 +154,7 @@ body.locked .app { display: none; }
   pointer-events: none;
 }
 .hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.hero-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .title {
   margin: 0;
   font-size: 25px;
@@ -171,6 +172,48 @@ body.locked .app { display: none; }
   cursor: pointer;
   opacity: .85;
 }
+/* 새로고침 버튼 — 누르면 최신 데이터를 다시 받아 옵니다. */
+.refresh-now {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: .85;
+  -webkit-tap-highlight-color: transparent;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.refresh-now:active { transform: scale(.94); }
+.refresh-now.is-busy {
+  color: var(--mint);
+  border-color: var(--mint);
+  animation: refresh-spin .8s linear infinite;
+}
+.refresh-now.is-done {
+  color: var(--mint);
+  border-color: var(--mint);
+  background: var(--mint-soft);
+}
+.refresh-now.is-fail { color: var(--urgent); border-color: #e4b8ae; }
+@keyframes refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .refresh-now.is-busy { animation: none; }
+}
+.refresh-note {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mint);
+  opacity: 0;
+  transition: opacity .18s;
+}
+.refresh-note.show { opacity: 1; }
 .hero-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .today { margin: 0; font-size: 13.5px; color: var(--muted); }
 .pill {
