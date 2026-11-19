@@ -8,6 +8,7 @@
   var EXTRA_KEY = 'mytodo.extra.v1';    /* 내가 추가한 항목 */
   var KEY_STORE = 'mytodo.key.v1';      /* 이 기기 잠금 해제 키 */
   var DAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
+  var MINE_CAT = '내가 추가';           /* 카테고리를 비우고 추가한 항목의 묶음 이름 */
 
   var ENC = null;      /* window.MY_TODO_ENC */
   var DATA = null;     /* 복호화된 보드 데이터 */
@@ -72,6 +73,33 @@
   }
 
   function norm(s) { return String(s || '').replace(/\s+/g, '').toLowerCase(); }
+
+  /* 우선순위 묶음(p1·p2 …)인지 — 이런 묶음보다 날짜 묶음(📌 내일까지)에 먼저 합칩니다. */
+  function isPriorityKind(kind) { return /^p\d+$/.test(String(kind || '')); }
+
+  function groupKind(g) {
+    return String((g && g.kind) || (g && g.priority ? 'p' + g.priority : ''));
+  }
+
+  /* 같은 마감일의 날짜 묶음을 찾습니다. (📌 내일까지 처럼 마감일로 묶인 섹션) */
+  function groupForDue(due) {
+    var pick = null;
+    (DATA && DATA.groups ? DATA.groups : []).forEach(function (g) {
+      if (pick || !g || !g.dueDate || g.dueDate !== due) return;
+      if (isPriorityKind(groupKind(g))) return;
+      pick = g;
+    });
+    return pick;
+  }
+
+  /* 마감일만 있는 항목을 담을 섹션 이름 */
+  function dueSectionLabel(due) {
+    var away = diffDays(TODAY || seoulToday(), due);
+    if (away === 0) return '📅 오늘까지';
+    if (away === 1) return '📌 내일까지';
+    var d = parseISO(due);
+    return '🗓️ ' + md(due) + '(' + DAY_KO[d.getDay()] + ')까지';
+  }
 
   function $(id) { return document.getElementById(id); }
 
@@ -210,12 +238,12 @@
         id: x.id,
         text: x.text,
         hint: '',
-        category: x.category || '내가 추가',
-        due: x.dueDate || '',
+        category: x.category || MINE_CAT,
+        due: x.dueDate || seoulToday(),
         badge: '',
         kind: 'add',
-        sectionId: 'mine',
-        sectionLabel: '➕ 내가 추가한 일',
+        sectionId: '',            /* 렌더할 때 마감일에 맞는 섹션으로 합칩니다 */
+        sectionLabel: '',
         sectionNote: '',
         sectionDue: '',
         order: 90,
@@ -275,7 +303,7 @@
     li.appendChild(check);
     li.appendChild(body);
 
-    var badgeText = isOverdue ? '긴급' : (entry.badge || (entry.extra && entry.due ? shortKo(entry.due) : ''));
+    var badgeText = isOverdue ? '긴급' : (entry.badge || '');
     if (badgeText) {
       var box = document.createElement('div');
       box.className = 'item-badges';
@@ -363,12 +391,60 @@
     var all = collect();
     var active = all.filter(function (it) { return !isDone(it.id); });
 
+    var groups = (DATA && DATA.groups) || [];
+    var groupMeta = {}, groupIndex = {};
+    groups.forEach(function (g, i) { groupMeta[g.id] = g; groupIndex[g.id] = i; });
+
+    function groupOrder(g) {
+      if (!g) return 900;
+      if (typeof g.priority === 'number' && g.priority > 0) return g.priority * 10;
+      if (typeof g.order === 'number' && g.order > 0) return g.order * 10;
+      return ((groupIndex[g.id] || 0) + 1) * 10;
+    }
+
+    var lastOrder = 0;
+    groups.forEach(function (g) { lastOrder = Math.max(lastOrder, groupOrder(g)); });
+
+    /* 날짜만 있는 섹션은 data.json 묶음들 사이의 제자리에 놓습니다. */
+    function dueSectionOrder(due) {
+      var next = null;
+      groups.forEach(function (g) {
+        if (!g || !g.dueDate || g.dueDate <= due) return;
+        var o = groupOrder(g);
+        if (next === null || o < next) next = o;
+      });
+      if (next !== null) return next - 5;
+      return lastOrder + 10;
+    }
+
+    function sectionDef(key, due) {
+      if (key.indexOf('g:') === 0) {
+        var g = groupMeta[key.slice(2)];
+        return {
+          label: g ? (g.label || '') : '',
+          note: g ? (g.note || '') : '',
+          dueDate: g ? (g.dueDate || '') : '',
+          order: groupOrder(g)
+        };
+      }
+      return { label: dueSectionLabel(due), note: '', dueDate: due, order: dueSectionOrder(due) };
+    }
+
     var overdue = [];
     var bySection = {}, sectionOrder = [];
     active.forEach(function (it) {
       if (it.due && it.due < TODAY) { overdue.push(it); return; }
-      if (!bySection[it.sectionId]) { bySection[it.sectionId] = []; sectionOrder.push(it.sectionId); }
-      bySection[it.sectionId].push(it);
+
+      /* 직접 추가한 항목은 마감일이 같은 날짜 묶음(예: 📌 내일까지)에 합칩니다. */
+      var key = it.sectionId ? ('g:' + it.sectionId) : null;
+      if (!key) {
+        var due = it.due || TODAY;
+        var g = groupForDue(due);
+        key = g ? ('g:' + g.id) : ('due:' + due);
+      }
+
+      if (!bySection[key]) { bySection[key] = []; sectionOrder.push(key); }
+      bySection[key].push(it);
     });
 
     /* 이월 항목은 마감이 오래된 것부터 */
@@ -387,18 +463,20 @@
       }));
     }
 
-    sectionOrder.forEach(function (sid) {
-      var items = bySection[sid];
-      /* data.json 그룹 순서대로 */
-      var meta = null;
-      (DATA.groups || []).forEach(function (g) { if (g.id === sid) meta = g; });
-      var label = meta ? (meta.label || '') : '➕ 내가 추가한 일';
-      var note = meta ? (meta.note || '') : '';
-      var dueIso = meta ? (meta.dueDate || '') : '';
+    sectionOrder.sort(function (a, b) {
+      var A = sectionDef(a, bySection[a][0].due || TODAY);
+      var B = sectionDef(b, bySection[b][0].due || TODAY);
+      if (A.order !== B.order) return A.order - B.order;
+      return String(A.dueDate).localeCompare(String(B.dueDate));
+    });
+
+    sectionOrder.forEach(function (key) {
+      var items = bySection[key];
+      var meta = sectionDef(key, items[0].due || TODAY);
       board.appendChild(makeSection({
-        label: label,
-        dueText: dueIso ? shortKo(dueIso) : '',
-        note: note,
+        label: meta.label,
+        dueText: meta.dueDate ? shortKo(meta.dueDate) : '',
+        note: meta.note,
         urgent: false,
         items: items
       }));
@@ -546,7 +624,10 @@
     if (!list) return;
     var names = [], seen = {};
     (DATA.groups || []).forEach(function (g) { if (g.category && !seen[g.category]) { seen[g.category] = 1; names.push(g.category); } });
-    all.forEach(function (it) { if (it.category && !seen[it.category]) { seen[it.category] = 1; names.push(it.category); } });
+    all.forEach(function (it) {
+      if (!it.category || it.category === MINE_CAT || seen[it.category]) return;
+      seen[it.category] = 1; names.push(it.category);
+    });
     list.innerHTML = '';
     names.forEach(function (n) {
       var o = document.createElement('option');
