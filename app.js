@@ -1,5 +1,5 @@
 /* ✨ 오늘의 할 일 — 이미경님 전용 보드
-   board-version: 20261119173016
+   board-version: 20261119173240
    데이터: 열 때마다 data.enc.json 을 직접 받아(data-enc.js 는 예비용) 비밀번호로 풀어서 씁니다.
    평문 할 일 내용은 저장소에 올리지 않습니다. */
 (function () {
@@ -357,7 +357,7 @@
     }).then(function (res) {
       refreshing = false;
       if (res === null) return;   /* 새 주소로 이동 중 */
-      if (res === 'updated') setRefreshState('done', '업데이트뎠어요');
+      if (res === 'updated') setRefreshState('done', '업데이트됐어요');
       else if (res === 'same') setRefreshState('done', '최신 상태예요');
       else if (res === 'locked') setRefreshState('fail', '잠금을 먼저 풀어 주세요');
       else setRefreshState('fail', '연결을 확인해 주세요');
